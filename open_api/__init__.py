@@ -1,8 +1,10 @@
 import os
 import json
+from functools import wraps
 from pydantic import AnyUrl
 from .models import APISpec, Components, ExternalDocumentation, Info, SecurityScheme
-from flask import Blueprint, render_template
+from flask import Blueprint, render_template, request
+from . import until
 
 
 class OpenApi:
@@ -12,8 +14,7 @@ class OpenApi:
         self.api_name = 'openapi'
         self.openapi_version = '3.0.3'
         self.info = Info(title='OpenAPI', version='1.0.0')
-        self.api_doc_url = f'//{self.api_name}.json'
-        self.markdown_url = f'/{self.api_name}/markdown'
+        self.api_doc_url = f'/{self.api_name}.json'
         self.components = Components()
         self.components_schemas = {}
         self.externalDocs = ExternalDocumentation(
@@ -87,3 +88,48 @@ class OpenApi:
         self.components.schemas = self.components_schemas
         spec.components = self.components
         return json.loads(spec.json(by_alias=True, exclude_none=True))
+
+    def parse_func_swagger(self, func):
+        parameters = []
+        operation = until.get_operation(func)
+        query = until.get_func_parameter(func, 'query')
+        if query:
+            _parameters, _components_schemas = until.parse_query(query)
+            parameters.extend(_parameters)
+            self.components_schemas.update(**_components_schemas)
+
+        operation.parameters = parameters if parameters else None
+        func.operation = operation
+        return query
+
+    def swagger(self, func):
+        func.swagger = True
+        query = self.parse_func_swagger(func)
+
+        @wraps(func)
+        def wrap(*args, **kwargs):
+            if query:
+                req_args = dict(request.args)
+                schema_instance = query(**req_args)
+                kwargs.update({'query': schema_instance})
+
+            return func(*args, **kwargs)
+
+        return wrap
+
+    def register_swagger(self):
+        """注册 swagger"""
+        register_methods = ('GET', 'POST', 'PUT', 'PATCH', 'DELETE')  # 只需要记录这五种请求方式
+
+        for url_rule in self.app.url_map.iter_rules():
+            path = url_rule.rule
+            func = self.app.view_functions[url_rule.endpoint]
+            methods = url_rule.methods
+
+            if not getattr(func, 'swagger', False):
+                continue
+
+            for method in register_methods:
+                if method in methods:
+                    until.get_responses({}, self.components_schemas, func.operation)
+                    until.parse_method(path, method, self.paths, func.operation)

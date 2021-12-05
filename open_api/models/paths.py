@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import List, Dict, Union
+from typing import List, Dict, Union, Any
 from pydantic import BaseModel, Field
 from .swagger import Reference, MediaType, Response, Schema
 
@@ -47,3 +47,10 @@ class PathItem(BaseModel):
     head: Operation = None
     patch: Operation = None
     trace: Operation = None
+
+
+class UnprocessableEntity(BaseModel):
+    loc: List[str] = Field(None, title="Location")
+    msg: str = Field(None, title="Message")
+    type_: str = Field(None, title="Error Type")
+    ctx: Dict[str, Any] = Field(None, title="Error context")
