@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from typing import Dict, Union
 from .swagger import Schema, Reference
+from .security import SecurityScheme
 
 
 class Components(BaseModel):
