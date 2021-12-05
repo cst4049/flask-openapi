@@ -17,6 +17,12 @@ def a(query: A):
     return 'a'
 
 
+@app.route('/bb', methods=['POST'])
+@openapi.swagger
+def a1(body: A):
+    return body.dict()
+
+
 openapi.register_swagger()
 
 app.run()

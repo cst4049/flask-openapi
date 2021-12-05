@@ -84,7 +84,7 @@ class OpenApi:
 
     def swagger(self, func):
         func._swagger = True
-        query = parse_func_info(func, self.components_schemas)
+        query, body = parse_func_info(func, self.components_schemas)
 
         @wraps(func)
         def wrap(*args, **kwargs):
@@ -92,6 +92,10 @@ class OpenApi:
                 req_args = dict(request.args)
                 schema_instance = query(**req_args)
                 kwargs.update({'query': schema_instance})
+            if body:
+                req_args = request.json
+                schema_instance = body(**req_args)
+                kwargs.update({'body': schema_instance})
 
             return func(*args, **kwargs)
 

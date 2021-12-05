@@ -1,9 +1,10 @@
 """公共解析函数"""
 import inspect
-from typing import Dict, Type, Callable, List, Tuple, Any
+from typing import Type, Dict, Callable, List, Tuple
 from pydantic import BaseModel
 from .models.apispec import OPENAPI3_REF_TEMPLATE, OPENAPI3_REF_PREFIX
-from .models.paths import Operation, Parameter, ParameterInType, Schema, Response, PathItem, MediaType, UnprocessableEntity
+from .models.paths import Operation, Parameter, ParameterInType, Schema, Response, PathItem, MediaType, \
+    UnprocessableEntity, RequestBody
 from .status import HTTP_STATUS
 
 
@@ -73,6 +74,34 @@ def parse_query(query: Type[BaseModel]) -> Tuple[List[Parameter], dict]:
         for name, value in definitions.items():
             components_schemas[name] = Schema(**value)
     return parameters, components_schemas
+
+
+def parse_body(body: Type[BaseModel]) -> Tuple[Dict[str, MediaType], dict]:
+    """Parse body model"""
+    schema = get_schema(body)
+    content = None
+    components_schemas = dict()
+    properties = schema.get('properties')
+    definitions = schema.get('definitions')
+
+    if properties:
+        title = schema.get('title')
+        components_schemas[title] = Schema(**schema)
+        content = {
+            "application/json": MediaType(
+                **{
+                    "schema": Schema(
+                        **{
+                            "$ref": f"{OPENAPI3_REF_PREFIX}/{title}"
+                        }
+                    )
+                }
+            )
+        }
+    if definitions:
+        for name, value in definitions.items():
+            components_schemas[name] = Schema(**value)
+    return content, components_schemas
 
 
 def get_responses(responses: dict, components_schemas: dict, operation: Operation) -> None:
@@ -157,14 +186,22 @@ def parse_func_info(func, components_schemas):
     parameters = []
     operation = get_operation(func)
     query = get_func_parameter(func, 'query')
+    body = get_func_parameter(func, 'body')
     if query:
         _parameters, _components_schemas = parse_query(query)
         parameters.extend(_parameters)
         components_schemas.update(**_components_schemas)
+    if body:
+        _content, _components_schemas = parse_body(body)
+        components_schemas.update(**_components_schemas)
+        requestBody = RequestBody(**{
+            "content": _content,
+        })
+        operation.requestBody = requestBody
 
     operation.parameters = parameters if parameters else None
     func.operation = operation
-    return query
+    return query, body
 
 
 def bind_rule_swagger(url_map, view_funcs, components_schemas, paths):
