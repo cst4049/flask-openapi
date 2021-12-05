@@ -53,7 +53,7 @@ class Encoding(BaseModel):
 
 
 class MediaType(BaseModel):
-    schema: Union[Schema, Reference] = Field(None)
+    schema_: Union[Schema, Reference] = Field(None, alias='schema')
     encoding: Dict[str, Encoding] = None
 
 
