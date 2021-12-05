@@ -1,9 +1,56 @@
 import os
 import json
 from functools import wraps
+from werkzeug.datastructures import MultiDict
+from pydantic import ValidationError
 from .models import APISpec, Components, ExternalDocumentation, Info, SecurityScheme
-from flask import Blueprint, render_template, request
+from flask import Blueprint, render_template, request, make_response, current_app
 from .until import parse_func_info, bind_rule_swagger
+
+
+def _do_wrapper(func, responses=None, path=None, query=None, form=None, body=None, **kwargs):
+    kwargs_ = dict()
+    try:
+        if path:
+            path_ = path(**kwargs)
+            kwargs_.update({"path": path_})
+        if query:
+            args = request.args or MultiDict()
+            args_dict = {}
+            for k, v in query.schema().get('properties', {}).items():
+                if v.get('type') == 'array':
+                    args_dict[k] = args.getlist(k)
+                else:
+                    args_dict[k] = args.get(k)
+            query_ = query(**args_dict)
+            kwargs_.update({"query": query_})
+        if form:
+            req_form = request.form or MultiDict()
+            form_dict = {}
+            for k, v in form.schema().get('properties', {}).items():
+                if v.get('type') == 'array':
+                    form_dict[k] = req_form.getlist(k)
+                else:
+                    form_dict[k] = req_form.get(k)
+            form_dict.update(**request.files.to_dict())
+            form_ = form(**form_dict)
+            kwargs_.update({"form": form_})
+        if body:
+            body_ = body(
+                **request.get_json(silent=True) if request.get_json(silent=True) is not None else {})
+            kwargs_.update({"body": body_})
+    except ValidationError as e:
+        resp = make_response(e.json(), 422)
+        resp.headers['Content-Type'] = 'application/json'
+        return resp
+
+    resp = func(**kwargs_)
+
+    # validate_resp = current_app.config.get("VALIDATE_RESPONSE", False)
+    # if validate_resp and responses:
+    #     validate_response(resp, responses)
+
+    return resp
 
 
 class OpenApi:
@@ -84,20 +131,11 @@ class OpenApi:
 
     def swagger(self, func):
         func._swagger = True
-        query, body = parse_func_info(func, self.components_schemas)
+        query, body, path = parse_func_info(func, self.components_schemas)
 
         @wraps(func)
-        def wrap(*args, **kwargs):
-            if query:
-                req_args = dict(request.args)
-                schema_instance = query(**req_args)
-                kwargs.update({'query': schema_instance})
-            if body:
-                req_args = request.json
-                schema_instance = body(**req_args)
-                kwargs.update({'body': schema_instance})
-
-            return func(*args, **kwargs)
+        def wrap(**kwargs):
+            return _do_wrapper(func, query=query, body=body, path=path, **kwargs)
 
         return wrap
 

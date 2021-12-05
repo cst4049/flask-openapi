@@ -6,6 +6,7 @@ from .models.apispec import OPENAPI3_REF_TEMPLATE, OPENAPI3_REF_PREFIX
 from .models.paths import Operation, Parameter, ParameterInType, Schema, Response, PathItem, MediaType, \
     UnprocessableEntity, RequestBody
 from .status import HTTP_STATUS
+from werkzeug.routing import parse_rule
 
 
 Response_422 = Response(
@@ -22,6 +23,19 @@ Response_422 = Response(
     }
 )
 Response_500 = Response(description=HTTP_STATUS["500"])
+
+
+def _parse_rule(rule: str) -> str:
+    """Flask route conversion to openapi:
+    /pet/<petId> --> /pet/{petId}
+    """
+    uri = ''
+    for converter, args, variable in parse_rule(str(rule)):
+        if converter is None:
+            uri += variable
+            continue
+        uri += "{%s}" % variable
+    return uri
 
 
 def get_operation(func: Callable) -> Operation:
@@ -102,6 +116,30 @@ def parse_body(body: Type[BaseModel]) -> Tuple[Dict[str, MediaType], dict]:
         for name, value in definitions.items():
             components_schemas[name] = Schema(**value)
     return content, components_schemas
+
+
+def parse_path(path: Type[BaseModel]) -> Tuple[List[Parameter], dict]:
+    """Parse path model"""
+    schema = get_schema(path)
+    parameters = []
+    components_schemas = dict()
+    properties = schema.get('properties')
+    definitions = schema.get('definitions')
+
+    if properties:
+        for name, value in properties.items():
+            data = {
+                "name": name,
+                "in": ParameterInType.path,
+                "description": value.get("description"),
+                "required": True,
+                "schema": Schema(**value)
+            }
+            parameters.append(Parameter(**data))
+    if definitions:
+        for name, value in definitions.items():
+            components_schemas[name] = Schema(**value)
+    return parameters, components_schemas
 
 
 def get_responses(responses: dict, components_schemas: dict, operation: Operation) -> None:
@@ -187,6 +225,7 @@ def parse_func_info(func, components_schemas):
     operation = get_operation(func)
     query = get_func_parameter(func, 'query')
     body = get_func_parameter(func, 'body')
+    path = get_func_parameter(func, 'path')
     if query:
         _parameters, _components_schemas = parse_query(query)
         parameters.extend(_parameters)
@@ -198,10 +237,14 @@ def parse_func_info(func, components_schemas):
             "content": _content,
         })
         operation.requestBody = requestBody
+    if path:
+        _parameters, _components_schemas = parse_path(path)
+        parameters.extend(_parameters)
+        components_schemas.update(**_components_schemas)
 
     operation.parameters = parameters if parameters else None
     func.operation = operation
-    return query, body
+    return query, body, path
 
 
 def bind_rule_swagger(url_map, view_funcs, components_schemas, paths):
@@ -215,6 +258,7 @@ def bind_rule_swagger(url_map, view_funcs, components_schemas, paths):
         if not getattr(func, '_swagger', False):  # 不需要swagger处理的接口
             continue
 
+        path = _parse_rule(path)
         for method in register_methods:
             if method in methods:
                 get_responses({}, components_schemas, func.operation)

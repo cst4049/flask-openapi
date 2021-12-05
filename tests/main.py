@@ -11,6 +11,10 @@ class A(BaseModel):
     b: str
 
 
+class C(BaseModel):
+    aa: str
+
+
 @app.get('/')
 @openapi.swagger
 def a(query: A):
@@ -21,6 +25,15 @@ def a(query: A):
 @openapi.swagger
 def a1(body: A):
     return body.dict()
+
+
+@app.route('/cc/<string:aa>', methods=['POST'])
+@openapi.swagger
+def a2(path: C, query: A, body: C):
+    print(path.dict())
+    print(query.dict())
+    print(body.dict())
+    return 'aaa'
 
 
 openapi.register_swagger()
