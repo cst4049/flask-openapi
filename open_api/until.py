@@ -1,11 +1,26 @@
 """公共解析函数"""
 import inspect
-from http import HTTPStatus
 from typing import Dict, Type, Callable, List, Tuple, Any
 from pydantic import BaseModel
 from .models.apispec import OPENAPI3_REF_TEMPLATE, OPENAPI3_REF_PREFIX
 from .models.paths import Operation, Parameter, ParameterInType, Schema, Response, PathItem, MediaType, UnprocessableEntity
 from .status import HTTP_STATUS
+
+
+Response_422 = Response(
+    description=HTTP_STATUS["422"],
+    content={
+        "application/json": MediaType(
+            **{"schema": Schema(
+                **{"type": "array",
+                   "items": {"$ref": f"{OPENAPI3_REF_PREFIX}/{UnprocessableEntity.__name__}"}
+                   }
+            )
+            }
+        )
+    }
+)
+Response_500 = Response(description=HTTP_STATUS["500"])
 
 
 def get_operation(func: Callable) -> Operation:
@@ -71,24 +86,10 @@ def get_responses(responses: dict, components_schemas: dict, operation: Operatio
     _responses = {}
     _schemas = {}
     if not responses.get("422"):
-        _responses["422"] = Response(
-            description=HTTP_STATUS["422"],
-            content={
-                "application/json": MediaType(
-                    **{
-                        "schema": Schema(
-                            **{
-                                "type": "array",
-                                "items": {"$ref": f"{OPENAPI3_REF_PREFIX}/{UnprocessableEntity.__name__}"}
-                            }
-                        )
-                    }
-                )
-            }
-        )
+        _responses["422"] = Response_422
         _schemas[UnprocessableEntity.__name__] = Schema(**UnprocessableEntity.schema())
     if not responses.get("500"):
-        _responses["500"] = Response(description=HTTP_STATUS["500"])
+        _responses["500"] = Response_500
     for key, response in responses.items():
         assert inspect.isclass(response) and \
                issubclass(response, BaseModel), f" {response} is invalid `pydantic.BaseModel`"
