@@ -1,38 +1,31 @@
 import os
 import json
 from functools import wraps
-from pydantic import AnyUrl
 from .models import APISpec, Components, ExternalDocumentation, Info, SecurityScheme
 from flask import Blueprint, render_template, request
-from . import until
+from .until import parse_func_info, bind_rule_swagger
 
 
 class OpenApi:
-    def __init__(self, app):
+    def __init__(self, app, api_name='openapi'):
         self.app = app
         self.tags = []
-        self.api_name = 'openapi'
+        self.api_name = api_name
         self.openapi_version = '3.0.3'
         self.info = Info(title='OpenAPI', version='1.0.0')
         self.api_doc_url = f'/{self.api_name}.json'
         self.components = Components()
         self.components_schemas = {}
         self.externalDocs = ExternalDocumentation(
-            url=AnyUrl(
-                url=f'/{self.api_name}/markdown',
-                scheme='',
-                host=''
-                ),
+            url=f'/{self.api_name}/markdown',
             description='Export to markdown')
-        self.openapi = '3.0.3'
         self.paths = dict()
-
         self.securitySchemes = SecurityScheme
         self.docExpansion = 'list'
         self.oauth_config = dict()
-        self.register_template()
+        self.register_swagger_html()
 
-    def register_template(self):
+    def register_swagger_html(self):
         _here = os.path.dirname(__file__)
         template_folder = os.path.join(_here, 'templates')
         static_folder = os.path.join(template_folder, 'static')
@@ -89,22 +82,9 @@ class OpenApi:
         spec.components = self.components
         return json.loads(spec.json(by_alias=True, exclude_none=True))
 
-    def parse_func_swagger(self, func):
-        parameters = []
-        operation = until.get_operation(func)
-        query = until.get_func_parameter(func, 'query')
-        if query:
-            _parameters, _components_schemas = until.parse_query(query)
-            parameters.extend(_parameters)
-            self.components_schemas.update(**_components_schemas)
-
-        operation.parameters = parameters if parameters else None
-        func.operation = operation
-        return query
-
     def swagger(self, func):
-        func.swagger = True
-        query = self.parse_func_swagger(func)
+        func._swagger = True
+        query = parse_func_info(func, self.components_schemas)
 
         @wraps(func)
         def wrap(*args, **kwargs):
@@ -118,18 +98,5 @@ class OpenApi:
         return wrap
 
     def register_swagger(self):
-        """注册 swagger"""
-        register_methods = ('GET', 'POST', 'PUT', 'PATCH', 'DELETE')  # 只需要记录这五种请求方式
-
-        for url_rule in self.app.url_map.iter_rules():
-            path = url_rule.rule
-            func = self.app.view_functions[url_rule.endpoint]
-            methods = url_rule.methods
-
-            if not getattr(func, 'swagger', False):
-                continue
-
-            for method in register_methods:
-                if method in methods:
-                    until.get_responses({}, self.components_schemas, func.operation)
-                    until.parse_method(path, method, self.paths, func.operation)
+        """注册 swagger 路径与函数信息绑定"""
+        bind_rule_swagger(self.app.url_map, self.app.view_functions, self.components_schemas, self.paths)

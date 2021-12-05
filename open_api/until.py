@@ -117,7 +117,7 @@ def get_responses(responses: dict, components_schemas: dict, operation: Operatio
     operation.responses = _responses
 
 
-def parse_method(uri: str, method: str, paths: dict, operation: Operation) -> None:
+def bind_path_method_info(uri: str, method: str, paths: dict, operation: Operation) -> None:
     """
     :param uri: api route path
     :param method: get post put delete patch
@@ -149,3 +149,35 @@ def parse_method(uri: str, method: str, paths: dict, operation: Operation) -> No
             paths[uri] = PathItem(delete=operation)
         else:
             paths[uri].delete = operation
+
+
+def parse_func_info(func, components_schemas):
+    """函数信息解析 参数 文档..."""
+    parameters = []
+    operation = get_operation(func)
+    query = get_func_parameter(func, 'query')
+    if query:
+        _parameters, _components_schemas = parse_query(query)
+        parameters.extend(_parameters)
+        components_schemas.update(**_components_schemas)
+
+    operation.parameters = parameters if parameters else None
+    func.operation = operation
+    return query
+
+
+def bind_rule_swagger(url_map, view_funcs, components_schemas, paths):
+    register_methods = ('GET', 'POST', 'PUT', 'PATCH', 'DELETE')  # 只需要记录这五种请求方式
+
+    for url_rule in url_map.iter_rules():
+        path = url_rule.rule
+        func = view_funcs[url_rule.endpoint]
+        methods = url_rule.methods
+
+        if not getattr(func, '_swagger', False):  # 不需要swagger处理的接口
+            continue
+
+        for method in register_methods:
+            if method in methods:
+                get_responses({}, components_schemas, func.operation)
+                bind_path_method_info(path, method, paths, func.operation)
