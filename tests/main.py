@@ -22,20 +22,20 @@ class RES(BaseModel):
 
 
 @app.get('/')
-@openapi.swagger
+@openapi.swagger()
 def a(query: A):
     return 'a'
 
 
 @app.route('/bb', methods=['POST'])
-@openapi.swagger
+@openapi.swagger()
 def a1(body: A):
     return body.dict()
 
 
 @app.route('/cc/<string:aa>', methods=['POST'])
-@openapi.swagger
-def a2(path: C, query: A, body: C, responses={'200': RES}):
+@openapi.swagger(responses={'200': RES})
+def a2(path: C, query: A, body: C):
     print(path.dict())
     print(query.dict())
     print(body.dict())

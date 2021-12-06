@@ -5,7 +5,7 @@ from werkzeug.datastructures import MultiDict
 from pydantic import ValidationError
 from .models import APISpec, Components, ExternalDocumentation, Info, SecurityScheme
 from flask import Blueprint, render_template, request, make_response, current_app
-from .until import parse_func_info, bind_rule_swagger, validate_response
+from .until import parse_func_info, bind_rule_swagger, validate_response, get_operation, add_swagger_info
 
 
 def _do_wrapper(func, path=None, query=None, form=None, body=None, responses=None, **kwargs):
@@ -128,16 +128,20 @@ class OpenApi:
         spec.components = self.components
         return json.loads(spec.json(by_alias=True, exclude_none=True))
 
-    def swagger(self, func):
-        func._swagger = True
-        query, body, path, responses = parse_func_info(func, self.components_schemas)
+    def swagger(self, tags=None, responses=None):
+        def decorate(func):
+            func._swagger = True
+            operation = get_operation(func)
+            query, body, path = parse_func_info(func, self.components_schemas, operation)
+            add_swagger_info(self.components_schemas, responses, tags, operation)
 
-        @wraps(func)
-        def wrap(**kwargs):
-            return _do_wrapper(func, query=query, body=body, path=path, responses=responses, **kwargs)
+            @wraps(func)
+            def wrap(**kwargs):
+                return _do_wrapper(func, query=query, body=body, path=path, **kwargs)
 
-        return wrap
+            return wrap
+        return decorate
 
     def register_swagger(self):
         """注册 swagger 路径与函数信息绑定"""
-        bind_rule_swagger(self.app.url_map, self.app.view_functions, self.components_schemas, self.paths)
+        bind_rule_swagger(self.app.url_map, self.app.view_functions, self.paths)

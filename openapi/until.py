@@ -254,14 +254,12 @@ def validate_response(resp: Any, responses: Dict[str, Type[BaseModel]]) -> None:
         raise TypeError(f"`{resp_model.__name__}` validation failed, must be a mapping.")
 
 
-def parse_func_info(func, components_schemas):
+def parse_func_info(func, components_schemas, operation):
     """函数信息解析 参数 文档..."""
     parameters = []
-    operation = get_operation(func)
     query = get_func_parameter(func, 'query')
     body = get_func_parameter(func, 'body')
     path = get_func_parameter(func, 'path')
-    responses = get_func_parameter(func, 'responses', type='params')
     if query:
         _parameters, _components_schemas = parse_query(query)
         parameters.extend(_parameters)
@@ -279,12 +277,15 @@ def parse_func_info(func, components_schemas):
         components_schemas.update(**_components_schemas)
 
     operation.parameters = parameters if parameters else None
-    operation.responses = responses
     func.operation = operation
-    return query, body, path, responses
+    return query, body, path
 
 
-def bind_rule_swagger(url_map, view_funcs, components_schemas, paths):
+def add_swagger_info(components_schemas, responses, tags, operation):
+    get_responses(responses, components_schemas, operation)
+
+
+def bind_rule_swagger(url_map, view_funcs, paths):
     register_methods = ('GET', 'POST', 'PUT', 'PATCH', 'DELETE')  # 只需要记录这五种请求方式
 
     for url_rule in url_map.iter_rules():
@@ -298,5 +299,4 @@ def bind_rule_swagger(url_map, view_funcs, components_schemas, paths):
         path = _parse_rule(path)
         for method in register_methods:
             if method in methods:
-                get_responses(func.operation.responses, components_schemas, func.operation)
                 bind_path_method_info(path, method, paths, func.operation)
