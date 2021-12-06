@@ -15,6 +15,12 @@ class C(BaseModel):
     aa: str
 
 
+class RES(BaseModel):
+    code: int
+    msg: str
+    data: dict
+
+
 @app.get('/')
 @openapi.swagger
 def a(query: A):
@@ -29,11 +35,11 @@ def a1(body: A):
 
 @app.route('/cc/<string:aa>', methods=['POST'])
 @openapi.swagger
-def a2(path: C, query: A, body: C):
+def a2(path: C, query: A, body: C, responses={'200': RES}):
     print(path.dict())
     print(query.dict())
     print(body.dict())
-    return 'aaa'
+    return {'code': 0, 'msg': '', 'data': {'a': 'b'}}
 
 
 openapi.register_swagger()

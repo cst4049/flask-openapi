@@ -1,12 +1,15 @@
 """公共解析函数"""
 import inspect
-from typing import Type, Dict, Callable, List, Tuple
+from typing import Type, Dict, Callable, List, Tuple, Any
 from pydantic import BaseModel
 from .models.apispec import OPENAPI3_REF_TEMPLATE, OPENAPI3_REF_PREFIX
 from .models.paths import Operation, Parameter, ParameterInType, Schema, Response, PathItem, MediaType, \
     UnprocessableEntity, RequestBody
 from .status import HTTP_STATUS
 from werkzeug.routing import parse_rule
+
+from http import HTTPStatus
+from flask import Response as _Response
 
 
 Response_422 = Response(
@@ -50,13 +53,15 @@ def get_operation(func: Callable) -> Operation:
     return operation
 
 
-def get_func_parameter(func: Callable, arg_name='path') -> Type[BaseModel]:
+def get_func_parameter(func: Callable, arg_name='path', type='annotation') -> Type[BaseModel]:
     """Get view-func parameters.
     arg_name has six parameters to choose from: path, query, form, body, header, cookie.
     """
     signature = inspect.signature(func)
     p = signature.parameters.get(arg_name)
-    return p.annotation if p else None
+    if type == 'annotation':
+        return p.annotation if p else None
+    return p.default if p else None
 
 
 def get_schema(obj: Type[BaseModel]) -> dict:
@@ -219,6 +224,36 @@ def bind_path_method_info(uri: str, method: str, paths: dict, operation: Operati
             paths[uri].delete = operation
 
 
+def validate_response(resp: Any, responses: Dict[str, Type[BaseModel]]) -> None:
+    """Validate response"""
+    print("Warning: "
+          "You are using `VALIDATE_RESPONSE=True`, "
+          "please do not use it in the production environment, "
+          "because it will reduce the performance.")
+    if isinstance(resp, tuple):  # noqa
+        _resp, status_code = resp[:2]
+    elif isinstance(resp, _Response):
+        if resp.mimetype != "application/json":
+            # only application/json
+            return
+            # raise TypeError("`Response` mimetype must be application/json.")
+        _resp, status_code = resp.json, resp.status_code  # noqa
+    else:
+        _resp, status_code = resp, 200
+    if isinstance(status_code, HTTPStatus):
+        status_code = status_code.value
+
+    resp_model = responses.get(str(status_code))
+    if resp_model is None:
+        return
+    assert inspect.isclass(resp_model) and \
+           issubclass(resp_model, BaseModel), f"{resp_model} is invalid `pydantic.BaseModel`"
+    try:
+        resp_model(**_resp)
+    except TypeError:
+        raise TypeError(f"`{resp_model.__name__}` validation failed, must be a mapping.")
+
+
 def parse_func_info(func, components_schemas):
     """函数信息解析 参数 文档..."""
     parameters = []
@@ -226,6 +261,7 @@ def parse_func_info(func, components_schemas):
     query = get_func_parameter(func, 'query')
     body = get_func_parameter(func, 'body')
     path = get_func_parameter(func, 'path')
+    responses = get_func_parameter(func, 'responses', type='params')
     if query:
         _parameters, _components_schemas = parse_query(query)
         parameters.extend(_parameters)
@@ -243,8 +279,9 @@ def parse_func_info(func, components_schemas):
         components_schemas.update(**_components_schemas)
 
     operation.parameters = parameters if parameters else None
+    operation.responses = responses
     func.operation = operation
-    return query, body, path
+    return query, body, path, responses
 
 
 def bind_rule_swagger(url_map, view_funcs, components_schemas, paths):
@@ -261,5 +298,5 @@ def bind_rule_swagger(url_map, view_funcs, components_schemas, paths):
         path = _parse_rule(path)
         for method in register_methods:
             if method in methods:
-                get_responses({}, components_schemas, func.operation)
+                get_responses(func.operation.responses, components_schemas, func.operation)
                 bind_path_method_info(path, method, paths, func.operation)

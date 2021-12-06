@@ -5,10 +5,10 @@ from werkzeug.datastructures import MultiDict
 from pydantic import ValidationError
 from .models import APISpec, Components, ExternalDocumentation, Info, SecurityScheme
 from flask import Blueprint, render_template, request, make_response, current_app
-from .until import parse_func_info, bind_rule_swagger
+from .until import parse_func_info, bind_rule_swagger, validate_response
 
 
-def _do_wrapper(func, responses=None, path=None, query=None, form=None, body=None, **kwargs):
+def _do_wrapper(func, path=None, query=None, form=None, body=None, responses=None, **kwargs):
     kwargs_ = dict()
     try:
         if path:
@@ -46,9 +46,8 @@ def _do_wrapper(func, responses=None, path=None, query=None, form=None, body=Non
 
     resp = func(**kwargs_)
 
-    # validate_resp = current_app.config.get("VALIDATE_RESPONSE", False)
-    # if validate_resp and responses:
-    #     validate_response(resp, responses)
+    if responses:
+        validate_response(resp, responses)
 
     return resp
 
@@ -131,11 +130,11 @@ class OpenApi:
 
     def swagger(self, func):
         func._swagger = True
-        query, body, path = parse_func_info(func, self.components_schemas)
+        query, body, path, responses = parse_func_info(func, self.components_schemas)
 
         @wraps(func)
         def wrap(**kwargs):
-            return _do_wrapper(func, query=query, body=body, path=path, **kwargs)
+            return _do_wrapper(func, query=query, body=body, path=path, responses=responses, **kwargs)
 
         return wrap
 
