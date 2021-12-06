@@ -1,9 +1,12 @@
 from flask import Flask
-from openapi import OpenApi
+from openapi import OpenApi, Tag
 from pydantic import BaseModel
 
 app = Flask(__name__)
 openapi = OpenApi(app)
+
+
+tag1 = Tag(name='接口1')
 
 
 class A(BaseModel):
@@ -22,7 +25,7 @@ class RES(BaseModel):
 
 
 @app.get('/')
-@openapi.swagger()
+@openapi.swagger(tags=[tag1])
 def a(query: A):
     return 'a'
 
@@ -34,7 +37,7 @@ def a1(body: A):
 
 
 @app.route('/cc/<string:aa>', methods=['POST'])
-@openapi.swagger(responses={'200': RES})
+@openapi.swagger(responses={'200': RES}, tags=[tag1])
 def a2(path: C, query: A, body: C):
     print(path.dict())
     print(query.dict())

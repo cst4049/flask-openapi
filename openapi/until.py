@@ -283,6 +283,7 @@ def parse_func_info(func, components_schemas, operation):
 
 def add_swagger_info(components_schemas, responses, tags, operation):
     get_responses(responses, components_schemas, operation)
+    operation.tags = tags
 
 
 def bind_rule_swagger(url_map, view_funcs, paths):

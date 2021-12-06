@@ -1,6 +1,8 @@
-from flask_openapi3 import OpenAPI
+from flask_openapi3 import OpenAPI, Tag
 from pydantic import BaseModel
 
+
+tag = Tag(name='aaa')
 
 class A(BaseModel):
     a: str
@@ -13,7 +15,7 @@ class C(BaseModel):
 app = OpenAPI(__name__)
 
 
-@app.get('/')
+@app.get('/', tags=[tag])
 def a(query: A):
     return ''
 

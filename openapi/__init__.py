@@ -3,8 +3,8 @@ import json
 from functools import wraps
 from werkzeug.datastructures import MultiDict
 from pydantic import ValidationError
-from .models import APISpec, Components, ExternalDocumentation, Info, SecurityScheme
-from flask import Blueprint, render_template, request, make_response, current_app
+from .models import APISpec, Components, ExternalDocumentation, Info, SecurityScheme, Tag
+from flask import Blueprint, render_template, request, make_response
 from .until import parse_func_info, bind_rule_swagger, validate_response, get_operation, add_swagger_info
 
 
