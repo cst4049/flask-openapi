@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-# @Author  : llc
-# @Time    : 2021/6/21 15:54
 HTTP_STATUS = {
     # 1xx
     "100": "Continue",

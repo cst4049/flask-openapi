@@ -1,5 +1,5 @@
 from flask import Flask
-from open_api import OpenApi
+from openapi import OpenApi
 from pydantic import BaseModel
 
 app = Flask(__name__)
