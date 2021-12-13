@@ -147,6 +147,43 @@ def parse_path(path: Type[BaseModel]) -> Tuple[List[Parameter], dict]:
     return parameters, components_schemas
 
 
+def parse_form(form: Type[BaseModel]) -> Tuple[Dict[str, MediaType], dict]:
+    """Parse form model"""
+    schema = get_schema(form)
+    content = None
+    components_schemas = dict()
+    properties = schema.get('properties')
+    definitions = schema.get('definitions')
+
+    if properties:
+        title = schema.get('title')
+        components_schemas[title] = Schema(**schema)
+        encoding = {}
+        for k, v in form.schema().get('properties', {}).items():
+            if v.get('type') == 'array':
+                encoding[k] = {'style': 'form'}
+
+        content = {
+            "multipart/form-data": MediaType(
+                **{
+                    "schema": Schema(
+                        **{
+                            "$ref": f"{OPENAPI3_REF_PREFIX}/{title}"
+                        }
+                    ),
+                    "encoding": encoding
+                }
+            )
+        }
+    if definitions:
+        for name, value in definitions.items():
+            components_schemas[name] = Schema(**value)
+
+    assert content is not None, f"{form.__name__}'s properties cannot be empty."
+
+    return content, components_schemas
+
+
 def get_responses(responses: dict, components_schemas: dict, operation: Operation) -> None:
     """
     :param responses: Dict[str, BaseModel]
@@ -260,6 +297,7 @@ def parse_func_info(func, components_schemas, operation):
     query = get_func_parameter(func, 'query')
     body = get_func_parameter(func, 'body')
     path = get_func_parameter(func, 'path')
+    form = get_func_parameter(func, 'form')
     if query:
         _parameters, _components_schemas = parse_query(query)
         parameters.extend(_parameters)
@@ -275,10 +313,17 @@ def parse_func_info(func, components_schemas, operation):
         _parameters, _components_schemas = parse_path(path)
         parameters.extend(_parameters)
         components_schemas.update(**_components_schemas)
+    if form:
+        _content, _components_schemas = parse_form(form)
+        components_schemas.update(**_components_schemas)
+        requestBody = RequestBody(**{
+            "content": _content,
+        })
+        operation.requestBody = requestBody
 
     operation.parameters = parameters if parameters else None
     func.operation = operation
-    return query, body, path
+    return query, body, path, form
 
 
 def add_swagger_info(components_schemas, responses, tags, operation):

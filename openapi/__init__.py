@@ -132,12 +132,12 @@ class OpenApi:
         def decorate(func):
             func._swagger = True
             operation = get_operation(func)
-            query, body, path = parse_func_info(func, self.components_schemas, operation)
+            query, body, path, form = parse_func_info(func, self.components_schemas, operation)
             add_swagger_info(self.components_schemas, responses, tags, operation)
 
             @wraps(func)
             def wrap(**kwargs):
-                return _do_wrapper(func, query=query, body=body, path=path, **kwargs)
+                return _do_wrapper(func, query=query, body=body, path=path, form=form, **kwargs)
 
             return wrap
         return decorate
