@@ -18,6 +18,8 @@ def _do_wrapper(func, path=None, query=None, form=None, body=None, responses=Non
             args = request.args or MultiDict()
             args_dict = {}
             for k, v in query.schema().get('properties', {}).items():
+                if k not in args:
+                    continue
                 if v.get('type') == 'array':
                     args_dict[k] = args.getlist(k)
                 else:
@@ -28,6 +30,8 @@ def _do_wrapper(func, path=None, query=None, form=None, body=None, responses=Non
             req_form = request.form or MultiDict()
             form_dict = {}
             for k, v in form.schema().get('properties', {}).items():
+                if k not in req_form:
+                    continue
                 if v.get('type') == 'array':
                     form_dict[k] = req_form.getlist(k)
                 else:

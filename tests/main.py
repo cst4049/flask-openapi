@@ -11,8 +11,8 @@ tag1 = Tag(name='接口1')
 
 
 class A(BaseModel):
-    a: str
-    b: str
+    a: str = 'aaabb'
+    b: str = 'aaa'
 
 
 class C(BaseModel):
@@ -33,7 +33,7 @@ class RES(BaseModel):
 @app.get('/')
 @openapi.swagger(tags=[tag1])
 def a(query: A):
-    return 'a'
+    return query.dict(skip_defaults=True)
 
 
 @app.route('/bb', methods=['POST'])
