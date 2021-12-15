@@ -137,7 +137,8 @@ class OpenApi:
         def decorate(func):
             func._swagger = True
             operation = get_operation(func)
-            operation.security = security if security else [self.securitySchemes]
+            if security or self.securitySchemes:
+                operation.security = security if security else [self.securitySchemes]
             query, body, path, form = parse_func_info(func, self.components_schemas, operation)
             add_swagger_info(self.components_schemas, responses, tags, operation)
 

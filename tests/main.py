@@ -7,7 +7,7 @@ from openapi.validator import FileStorage
 app = Flask(__name__)
 
 secutity = {'apikey': APIKey(**{'name': 'token', 'in': 'header'})}
-openapi = OpenApi(app, secutity=secutity)
+openapi = OpenApi(app)
 
 
 tag1 = Tag(name='接口1')
