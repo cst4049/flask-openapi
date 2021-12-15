@@ -57,7 +57,7 @@ def _do_wrapper(func, path=None, query=None, form=None, body=None, responses=Non
 
 
 class OpenApi:
-    def __init__(self, app, api_name='openapi'):
+    def __init__(self, app, api_name='openapi', secutity=None):
         self.app = app
         self.tags = []
         self.api_name = api_name
@@ -70,7 +70,7 @@ class OpenApi:
             url=f'/{self.api_name}/markdown',
             description='Export to markdown')
         self.paths = dict()
-        self.securitySchemes = SecurityScheme
+        self.securitySchemes = secutity
         self.docExpansion = 'list'
         self.oauth_config = dict()
         self.register_swagger_html()
@@ -129,13 +129,15 @@ class OpenApi:
         # spec.tags = self.tags or None
         spec.paths = self.paths
         self.components.schemas = self.components_schemas
+        self.components.securitySchemes = self.securitySchemes
         spec.components = self.components
         return json.loads(spec.json(by_alias=True, exclude_none=True))
 
-    def swagger(self, tags=None, responses=None):
+    def swagger(self, tags=None, responses=None, security=None):
         def decorate(func):
             func._swagger = True
             operation = get_operation(func)
+            operation.security = security if security else [self.securitySchemes]
             query, body, path, form = parse_func_info(func, self.components_schemas, operation)
             add_swagger_info(self.components_schemas, responses, tags, operation)
 

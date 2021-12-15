@@ -1,10 +1,13 @@
 from flask import Flask
 from openapi import OpenApi, Tag
+from openapi.models.security import APIKey
 from pydantic import BaseModel
 from openapi.validator import FileStorage
 
 app = Flask(__name__)
-openapi = OpenApi(app)
+
+secutity = {'apikey': APIKey(**{'name': 'token', 'in': 'header'})}
+openapi = OpenApi(app, secutity=secutity)
 
 
 tag1 = Tag(name='接口1')
@@ -33,7 +36,7 @@ class RES(BaseModel):
 @app.get('/')
 @openapi.swagger(tags=[tag1])
 def a(query: A):
-    return query.dict(skip_defaults=True)
+    return query.dict(exclude_unset=True)
 
 
 @app.route('/bb', methods=['POST'])
@@ -60,4 +63,4 @@ def d(form: D):
 
 openapi.register_swagger()
 
-app.run()
+app.run(port=5002)
