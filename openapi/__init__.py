@@ -76,7 +76,7 @@ class OpenApi:
         if self.app:
             self.register_swagger_html()
 
-    def init_app(app):
+    def init_app(self, app):
         self.app = app
         self.register_swagger_html()
 
