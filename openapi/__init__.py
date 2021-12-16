@@ -57,7 +57,7 @@ def _do_wrapper(func, path=None, query=None, form=None, body=None, responses=Non
 
 
 class OpenApi:
-    def __init__(self, app, api_name='openapi', secutity=None):
+    def __init__(self, app=None, api_name='openapi', secutity=None):
         self.app = app
         self.tags = []
         self.api_name = api_name
@@ -73,6 +73,11 @@ class OpenApi:
         self.securitySchemes = secutity
         self.docExpansion = 'list'
         self.oauth_config = dict()
+        if self.app:
+            self.register_swagger_html()
+
+    def init_app(app):
+        self.app = app
         self.register_swagger_html()
 
     def register_swagger_html(self):
