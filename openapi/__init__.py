@@ -79,6 +79,7 @@ class OpenApi:
     def init_app(self, app):
         self.app = app
         self.register_swagger_html()
+        self.register_swagger()
 
     def register_swagger_html(self):
         _here = os.path.dirname(__file__)
