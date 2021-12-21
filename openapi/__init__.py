@@ -76,8 +76,10 @@ class OpenApi:
         if self.app:
             self.register_swagger_html()
 
-    def init_app(self, app):
+    def init_app(self, app, api_name='openapi', secutity=None):
         self.app = app
+        self.api_name = api_name
+        self.securitySchemes = secutity
         self.register_swagger_html()
         self.register_swagger()
 
@@ -158,3 +160,7 @@ class OpenApi:
     def register_swagger(self):
         """注册 swagger 路径与函数信息绑定"""
         bind_rule_swagger(self.app.url_map, self.app.view_functions, self.paths)
+
+
+opp = OpenApi()
+
