@@ -339,10 +339,23 @@ def bind_rule_swagger(url_map, view_funcs, paths):
         func = view_funcs[url_rule.endpoint]
         methods = url_rule.methods
 
+        if getattr(func, 'view_class', False):
+            """flask-restful"""
+            for method in register_methods:
+                if method not in methods:
+                    continue
+                _func = getattr(func.view_class, method.lower())
+                if not getattr(_func, '_swagger', False):  # 不需要swagger处理的接口
+                    continue
+                bind_path_method_info(path, method, paths, _func.operation)
+            continue
+
         if not getattr(func, '_swagger', False):  # 不需要swagger处理的接口
+            """flask app"""
             continue
 
         path = _parse_rule(path)
         for method in register_methods:
             if method in methods:
                 bind_path_method_info(path, method, paths, func.operation)
+
